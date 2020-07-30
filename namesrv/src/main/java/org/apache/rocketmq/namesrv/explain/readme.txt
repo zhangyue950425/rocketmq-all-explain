@@ -1,0 +1,14 @@
+NameServer:
+NameServer主要作用是为消息生产者和消息消费者提供有关主题Topic的路由信息，
+NameServer需要存储路由的信息，还能够管理Broker的节点，包括路由注册，路由删除等等功能。
+
+RocketMQ基于订阅发布机制，一个Topic拥有多个消息队列，一个Broker默认为每一主题
+创建4个读队列和4个写队列。多个Broker组成一个集群，BrokerName由相同的多台Broker组成Mater-Slave
+结构，brokerId为0的为Master，brokerId大于0的为Slave。BrokerLiveInfo中的lastUpdateTimestamp
+存储上次收到Broker心跳包的时间。
+
+路由注册：
+RocketMQ路由注册是通过Broker与NameServer的心跳功能实现。Broker启动时向集群中所有NameServer发送心跳语句，
+每隔30秒向集群中所有NameServer发送心跳包，NameServer收到Broker心跳包时会更新brokerLiveTable缓存中
+BrokerLiveInfo的lastUpdateTimestamp，然后NameServer每隔10秒（定时任务）扫描brokerLiveTable，如果连续120
+秒没有收到心跳包，NameServer将移除该Broker的路由信息同时关闭Socket连接。
