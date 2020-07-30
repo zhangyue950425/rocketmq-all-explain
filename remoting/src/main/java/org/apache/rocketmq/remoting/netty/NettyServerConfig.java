@@ -16,9 +16,15 @@
  */
 package org.apache.rocketmq.remoting.netty;
 
+/**
+ * NameServer网络参数配置类
+ */
 public class NettyServerConfig implements Cloneable {
+    //NameServer监听端口，后面会赋值为9876
     private int listenPort = 8888;
+    //Netty业务线程池线程个数
     private int serverWorkerThreads = 8;
+    //Netty public线程池线程个数，
     private int serverCallbackExecutorThreads = 0;
     private int serverSelectorThreads = 3;
     private int serverOnewaySemaphoreValue = 256;
