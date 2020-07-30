@@ -24,15 +24,22 @@ public class NettyServerConfig implements Cloneable {
     private int listenPort = 8888;
     //Netty业务线程池线程个数
     private int serverWorkerThreads = 8;
-    //Netty public线程池线程个数，
+    //Netty public线程池线程个数，根据业务类型会创建不同的线程池，比如处理消息发送，消息消费，心跳检测等等
+    //如果该业务类型没有注册线程池的话就要由pulic处理
     private int serverCallbackExecutorThreads = 0;
+    //IO 线程池线程个数
     private int serverSelectorThreads = 3;
+    //send oneway 消息请求并发度(Broker端参数)
     private int serverOnewaySemaphoreValue = 256;
+    //异步消息发送最大并行度（Broker端参数）
     private int serverAsyncSemaphoreValue = 64;
+    //网络连接最大k空闲时间，默认是120s，如果连接空闲时间超过这个设置的值的话连接将会被关闭
     private int serverChannelMaxIdleTimeSeconds = 120;
-
+    //网络socket发送缓存区大小，默认是64k
     private int serverSocketSndBufSize = NettySystemConfig.socketSndbufSize;
+    //网络socket接收缓存区大小，默认是64k
     private int serverSocketRcvBufSize = NettySystemConfig.socketRcvbufSize;
+    //ByteBuffer是否开启缓存，建议开启
     private boolean serverPooledByteBufAllocatorEnable = true;
 
     /**
@@ -42,6 +49,7 @@ public class NettyServerConfig implements Cloneable {
      * ../glibc-2.10.1/configure \ --prefix=/usr \ --with-headers=/usr/include \
      * --host=x86_64-linux-gnu \ --build=x86_64-pc-linux-gnu \ --without-gd
      */
+    //是否启用Epoll IO，Linux系统建议开启
     private boolean useEpollNativeSelector = false;
 
     public int getListenPort() {
