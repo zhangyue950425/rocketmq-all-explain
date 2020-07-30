@@ -88,6 +88,7 @@ public class NamesrvController {
 
             @Override
             public void run() {
+                //定时器：每隔10秒扫描一次Broker，移除处于不激活状态的Broker
                 NamesrvController.this.routeInfoManager.scanNotActiveBroker();
             }
         }, 5, 10, TimeUnit.SECONDS);
@@ -96,6 +97,7 @@ public class NamesrvController {
 
             @Override
             public void run() {
+                //定时器：每隔10分钟打印一次KV配置
                 NamesrvController.this.kvConfigManager.printAllPeriodically();
             }
         }, 1, 10, TimeUnit.MINUTES);

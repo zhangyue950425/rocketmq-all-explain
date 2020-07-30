@@ -143,6 +143,9 @@ public class NamesrvStartup {
             System.exit(-3);
         }
 
+        //注册JVM钩子函数并启动服务器，以便监听Broker，消息生产者的网络请求
+        //这里展示了一种编程方式，如果代码里面使用了线程池，一种优雅停机的方式是注册一个JVM钩子，
+        // 在JVM进程关闭之前先将线程池关闭，及时释放资源
         Runtime.getRuntime().addShutdownHook(new ShutdownHookThread(log, new Callable<Void>() {
             @Override
             public Void call() throws Exception {
