@@ -126,27 +126,38 @@ public class BrokerOuterAPI {
         final List<RegisterBrokerResult> registerBrokerResultList = Lists.newArrayList();
         List<String> nameServerAddressList = this.remotingClient.getNameServerAddressList();
         if (nameServerAddressList != null && nameServerAddressList.size() > 0) {
-
+            //Broker向NameServer发送心跳包的网络部分代码
+            //首先封装请求头
             final RegisterBrokerRequestHeader requestHeader = new RegisterBrokerRequestHeader();
+            //Broker地址
             requestHeader.setBrokerAddr(brokerAddr);
+            //BrokerId：Master指定为0，Slave指定为>0
             requestHeader.setBrokerId(brokerId);
+            //Broker名称
             requestHeader.setBrokerName(brokerName);
+            //Broker所属集群名称
             requestHeader.setClusterName(clusterName);
+            //Master地址，初次访问的时候为空，Slave向NameServer注册后返回
             requestHeader.setHaServerAddr(haServerAddr);
+            //是否采用压缩算法
             requestHeader.setCompressed(compressed);
 
+            //请求体
             RegisterBrokerBody requestBody = new RegisterBrokerBody();
+            //主题配置：内部封装的是一个Map结构，存放Broker启动的时候默认的topic。
             requestBody.setTopicConfigSerializeWrapper(topicConfigWrapper);
             requestBody.setFilterServerList(filterServerList);
             final byte[] body = requestBody.encode(compressed);
             final int bodyCrc32 = UtilAll.crc32(body);
             requestHeader.setBodyCrc32(bodyCrc32);
             final CountDownLatch countDownLatch = new CountDownLatch(nameServerAddressList.size());
+            //遍历NameServer列表，Broker消息服务器依次向NameServer发送心跳包
             for (final String namesrvAddr : nameServerAddressList) {
                 brokerOuterExecutor.execute(new Runnable() {
                     @Override
                     public void run() {
                         try {
+
                             RegisterBrokerResult result = registerBroker(namesrvAddr,oneway, timeoutMills,requestHeader,body);
                             if (result != null) {
                                 registerBrokerResultList.add(result);
@@ -171,6 +182,21 @@ public class BrokerOuterAPI {
         return registerBrokerResultList;
     }
 
+    /**
+     * 对于一个NameServer发送心跳包的逻辑
+     * @param namesrvAddr
+     * @param oneway
+     * @param timeoutMills
+     * @param requestHeader
+     * @param body
+     * @return
+     * @throws RemotingCommandException
+     * @throws MQBrokerException
+     * @throws RemotingConnectException
+     * @throws RemotingSendRequestException
+     * @throws RemotingTimeoutException
+     * @throws InterruptedException
+     */
     private RegisterBrokerResult registerBroker(
         final String namesrvAddr,
         final boolean oneway,

@@ -51,6 +51,7 @@ import org.apache.rocketmq.remoting.common.RemotingUtil;
 public class RouteInfoManager {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.NAMESRV_LOGGER_NAME);
     private final static long BROKER_CHANNEL_EXPIRED_TIME = 1000 * 60 * 2;
+    //可重入读写锁：使用？？？(复习和学习)
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
     //Topic消息队列路由信息，消息发送时根据路由表进行负载均衡
     private final HashMap<String/* topic */, List<QueueData>> topicQueueTable;
@@ -107,6 +108,18 @@ public class RouteInfoManager {
         return topicList.encode();
     }
 
+    /**
+     * 注册Broker方法：由NameServer调用
+     * @param clusterName
+     * @param brokerAddr
+     * @param brokerName
+     * @param brokerId
+     * @param haServerAddr
+     * @param topicConfigWrapper
+     * @param filterServerList
+     * @param channel
+     * @return
+     */
     public RegisterBrokerResult registerBroker(
         final String clusterName,
         final String brokerAddr,
@@ -119,21 +132,30 @@ public class RouteInfoManager {
         RegisterBrokerResult result = new RegisterBrokerResult();
         try {
             try {
+                //现加写锁，防止并发修改RoutineInfoManager中的路由表信息：可中断的写锁
                 this.lock.writeLock().lockInterruptibly();
-
+                //从<clusterAddrTable>拿出某个集群的Broker列表
                 Set<String> brokerNames = this.clusterAddrTable.get(clusterName);
+                //该集群中Broker列表为空的话，创建一个集合放入<clusterAddrTable>中
                 if (null == brokerNames) {
                     brokerNames = new HashSet<String>();
                     this.clusterAddrTable.put(clusterName, brokerNames);
                 }
+                //将需要注册的Broker加入
                 brokerNames.add(brokerName);
+                //以上是对这次Broker注册中<clusterAddrTable>的维护
 
+                //是否是首次注册的Broker标志？？？
                 boolean registerFirst = false;
-
+                //首先通过Broker名称从<brokerAddrTable>获取地址信息对象，类型是：BrokerData
                 BrokerData brokerData = this.brokerAddrTable.get(brokerName);
+                //没有的话说明这个Broker是首次注册
                 if (null == brokerData) {
+                    //设置首次注册的标志
                     registerFirst = true;
+                    //新建BrokerData
                     brokerData = new BrokerData(clusterName, brokerName, new HashMap<Long, String>());
+                    //并放入<brokerAddrTable>中
                     this.brokerAddrTable.put(brokerName, brokerData);
                 }
                 Map<Long, String> brokerAddrsMap = brokerData.getBrokerAddrs();
@@ -146,10 +168,13 @@ public class RouteInfoManager {
                         it.remove();
                     }
                 }
-
+                //如果存在的话替换原先的Broker信息
                 String oldAddr = brokerData.getBrokerAddrs().put(brokerId, brokerAddr);
                 registerFirst = registerFirst || (null == oldAddr);
 
+                //<topicQueueTable>的维护：
+                //如果Broker为Master，并且Topic配置信息发生变化或者初次注册，则需要创建或者是更新
+                //Topic路由元数据，填充topicQueueTable。
                 if (null != topicConfigWrapper
                     && MixAll.MASTER_ID == brokerId) {
                     if (this.isBrokerTopicConfigChanged(brokerAddr, topicConfigWrapper.getDataVersion())
@@ -158,22 +183,25 @@ public class RouteInfoManager {
                             topicConfigWrapper.getTopicConfigTable();
                         if (tcTable != null) {
                             for (Map.Entry<String, TopicConfig> entry : tcTable.entrySet()) {
+                                //更新Broker对应的队列信息
                                 this.createAndUpdateQueueData(brokerName, entry.getValue());
                             }
                         }
                     }
                 }
 
+                //更新BrokerLiveInfo，存活Broker信息表，BrokerLiveInfo是执行路由删除的重要依据
                 BrokerLiveInfo prevBrokerLiveInfo = this.brokerLiveTable.put(brokerAddr,
                     new BrokerLiveInfo(
                         System.currentTimeMillis(),
                         topicConfigWrapper.getDataVersion(),
                         channel,
                         haServerAddr));
+                //prevBrokerLiveInfo为空表示这个Broker是新注册的，没有存过相关的队列信息
                 if (null == prevBrokerLiveInfo) {
                     log.info("new broker registered, {} HAServer: {}", brokerAddr, haServerAddr);
                 }
-
+                //注册Broker的filterList过滤Server地址列表，一个Broker上会关联多个
                 if (filterServerList != null) {
                     if (filterServerList.isEmpty()) {
                         this.filterServerTable.remove(brokerAddr);
@@ -182,9 +210,12 @@ public class RouteInfoManager {
                     }
                 }
 
+                //此时Broker是从节点的话
                 if (MixAll.MASTER_ID != brokerId) {
+                    //获取它对应的主节点地址
                     String masterAddr = brokerData.getBrokerAddrs().get(MixAll.MASTER_ID);
                     if (masterAddr != null) {
+                        //获取主节点的存活信息
                         BrokerLiveInfo brokerLiveInfo = this.brokerLiveTable.get(masterAddr);
                         if (brokerLiveInfo != null) {
                             result.setHaServerAddr(brokerLiveInfo.getHaServerAddr());

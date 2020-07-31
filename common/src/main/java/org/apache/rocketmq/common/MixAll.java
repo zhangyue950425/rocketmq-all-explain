@@ -71,6 +71,7 @@ public class MixAll {
     public static final List<String> LOCAL_INET_ADDRESS = getLocalInetAddress();
     public static final String LOCALHOST = localhost();
     public static final String DEFAULT_CHARSET = "UTF-8";
+    //Master Broker的ID
     public static final long MASTER_ID = 0L;
     public static final long CURRENT_JVM_PID = getPID();
     public static final String RETRY_GROUP_TOPIC_PREFIX = "%RETRY%";
