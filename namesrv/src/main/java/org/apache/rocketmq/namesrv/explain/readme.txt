@@ -25,3 +25,7 @@ RocketMQ有两个点会触发路由删除：
 2）Broker在被正常关闭的时候，会执行unregisterBroker指令。
 以上两种触发方式都是有个逻辑，就是从topicQueueTable，brokerAddrTable，brokerLiveTable，filterServerTable删除
 与该Broker相关的信息，主要是RoutineInfoManager.scanNotActiveBroker()。
+
+路由发现：
+1）被动处理的，Topic队列发生变化的时候不会主动推送给客户端，而是客户端定时拉取主题最新的路由。
+2）路由发现的实现类：org.apache.rocketmq.namesrv.processor.DefaultRequestProcessor#getRouteInfoByTopic()

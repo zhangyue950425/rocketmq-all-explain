@@ -350,29 +350,40 @@ public class DefaultRequestProcessor extends AsyncNettyRequestProcessor implemen
         return response;
     }
 
+    /**
+     * 路由发现实现类
+     * @param ctx
+     * @param request
+     * @return
+     * @throws RemotingCommandException
+     */
     public RemotingCommand getRouteInfoByTopic(ChannelHandlerContext ctx,
         RemotingCommand request) throws RemotingCommandException {
+        //1.构建返回response实体
         final RemotingCommand response = RemotingCommand.createResponseCommand(null);
+        //2.解码request
         final GetRouteInfoRequestHeader requestHeader =
             (GetRouteInfoRequestHeader) request.decodeCommandCustomHeader(GetRouteInfoRequestHeader.class);
 
+        //3.通过routeInfoManager.pickupTopicRouteData():通过request中的Topic获取Topic信息
         TopicRouteData topicRouteData = this.namesrvController.getRouteInfoManager().pickupTopicRouteData(requestHeader.getTopic());
-
+        //topicRouteData返回为null的话表示topicQueueTable(通过topic获取队列信息)或者是brokerAddrTable(通过Broker名称获取Broker信息)其中有一个没有数据
         if (topicRouteData != null) {
+            //判断该Topic是否是顺序消息，从NameServer的KVconfig中获取关于顺序消息相关的配置填充到路由信息
             if (this.namesrvController.getNamesrvConfig().isOrderMessageEnable()) {
                 String orderTopicConf =
                     this.namesrvController.getKvConfigManager().getKVConfig(NamesrvUtil.NAMESPACE_ORDER_TOPIC_CONFIG,
                         requestHeader.getTopic());
                 topicRouteData.setOrderTopicConf(orderTopicConf);
             }
-
+            //对路由信息实体编码：转化为JSON，使用fastjson，设置成功的返回码
             byte[] content = topicRouteData.encode();
             response.setBody(content);
             response.setCode(ResponseCode.SUCCESS);
             response.setRemark(null);
             return response;
         }
-
+        //根据Topic没有查询到队列信息的话或者没有查询到Broker信息的话返回错误码：Topic不存在
         response.setCode(ResponseCode.TOPIC_NOT_EXIST);
         response.setRemark("No topic route info in name server for the topic: " + requestHeader.getTopic()
             + FAQUrl.suggestTodo(FAQUrl.APPLY_TOPIC_URL));

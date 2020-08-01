@@ -424,25 +424,34 @@ public class RouteInfoManager {
 
         try {
             try {
+                //获取读锁，因为防止并发读取
                 this.lock.readLock().lockInterruptibly();
+                //从topicQueueTable中通过Topic获取对应的队列信息
                 List<QueueData> queueDataList = this.topicQueueTable.get(topic);
+                //该Topic对应的队列信息不为空的话处理：读取数据，设置标志字段表示"找到队列"
                 if (queueDataList != null) {
                     topicRouteData.setQueueDatas(queueDataList);
+                    //队列找到的标志字段，设置为true
                     foundQueueData = true;
 
+                    //遍历找到的队列集合，将每隔队列对应的Broker名称放入一个集合中
                     Iterator<QueueData> it = queueDataList.iterator();
                     while (it.hasNext()) {
                         QueueData qd = it.next();
                         brokerNameSet.add(qd.getBrokerName());
                     }
-
+                    //遍历Broker名称集合
                     for (String brokerName : brokerNameSet) {
+                        //通过Broker名称从<brokerAddrTable>拿出Broker对应的信息实体
                         BrokerData brokerData = this.brokerAddrTable.get(brokerName);
                         if (null != brokerData) {
+                            //<brokerAddrTable>中取出的数据不为空的话，构建一个复制实体，放入brokerDataList中
+                            //？？？为什么是clone()方法
                             BrokerData brokerDataClone = new BrokerData(brokerData.getCluster(), brokerData.getBrokerName(), (HashMap<Long, String>) brokerData
                                 .getBrokerAddrs().clone());
                             brokerDataList.add(brokerDataClone);
                             foundBrokerData = true;
+                            //遍历这个Broker名称得到的地址列表（会有多个地址列表根据一个Broker的名称，因为会有主从）进行遍历，拿到每个地址对应的过滤服务器列表
                             for (final String brokerAddr : brokerDataClone.getBrokerAddrs().values()) {
                                 List<String> filterServerList = this.filterServerTable.get(brokerAddr);
                                 filterServerMap.put(brokerAddr, filterServerList);
@@ -451,6 +460,7 @@ public class RouteInfoManager {
                     }
                 }
             } finally {
+                //最后要释放读锁
                 this.lock.readLock().unlock();
             }
         } catch (Exception e) {

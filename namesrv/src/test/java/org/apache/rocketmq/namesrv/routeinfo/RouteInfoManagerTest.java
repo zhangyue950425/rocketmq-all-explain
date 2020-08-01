@@ -18,10 +18,12 @@ package org.apache.rocketmq.namesrv.routeinfo;
 
 import io.netty.channel.Channel;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.rocketmq.common.TopicConfig;
 import org.apache.rocketmq.common.namesrv.RegisterBrokerResult;
 import org.apache.rocketmq.common.protocol.body.TopicConfigSerializeWrapper;
+import org.apache.rocketmq.common.protocol.route.BrokerData;
 import org.apache.rocketmq.common.protocol.route.TopicRouteData;
 import org.junit.After;
 import org.junit.Assert;
@@ -34,6 +36,18 @@ import static org.mockito.Mockito.mock;
 public class RouteInfoManagerTest {
 
     private static RouteInfoManager routeInfoManager;
+
+    public static void main(String[] args) {
+        //hashmap的浅拷贝
+        HashMap<Long, String> map  = new HashMap<Long, String>(128);
+        map.put(1L, "1");
+        map.put(2L, "2");
+        HashMap<Long, String> copyMap = (HashMap<Long, String>) map.clone();
+        System.out.println("map:" + map);
+        System.out.println("copyMap:" + copyMap);
+        System.out.println(map == copyMap);
+
+    }
 
     @Before
     public void setup() {
