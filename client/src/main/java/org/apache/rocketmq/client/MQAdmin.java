@@ -54,6 +54,7 @@ public interface MQAdmin {
      * @param mq Instance of MessageQueue
      * @param timestamp from when in milliseconds.
      * @return offset
+     * 根据时间戳从队列中查找其偏移量
      */
     long searchOffset(final MessageQueue mq, final long timestamp) throws MQClientException;
 
@@ -62,6 +63,7 @@ public interface MQAdmin {
      *
      * @param mq Instance of MessageQueue
      * @return the max offset
+     * 查找该消息队列中最大的物理偏移量
      */
     long maxOffset(final MessageQueue mq) throws MQClientException;
 
@@ -70,6 +72,7 @@ public interface MQAdmin {
      *
      * @param mq Instance of MessageQueue
      * @return the minimum offset
+     * 查找该消息队列中最小的物理偏移量
      */
     long minOffset(final MessageQueue mq) throws MQClientException;
 
@@ -86,18 +89,20 @@ public interface MQAdmin {
      *
      * @param offsetMsgId message id
      * @return message
+     * 根据消息ID查询消息
      */
     MessageExt viewMessage(final String offsetMsgId) throws RemotingException, MQBrokerException,
         InterruptedException, MQClientException;
 
     /**
      * Query messages
+     * 根据条件查询消息
      *
-     * @param topic message topic
-     * @param key message key index word
-     * @param maxNum max message number
-     * @param begin from when
-     * @param end to when
+     * @param topic message topic         消息主题
+     * @param key message key index word  消息索引字段
+     * @param maxNum max message number   本次最多取出数据条数
+     * @param begin from when             开始时间
+     * @param end to when                 结束时间
      * @return Instance of QueryResult
      */
     QueryResult queryMessage(final String topic, final String key, final int maxNum, final long begin,
@@ -105,6 +110,7 @@ public interface MQAdmin {
 
     /**
      * @return The {@code MessageExt} of given msgId
+     * 根据消息ID和主题查询消息
      */
     MessageExt viewMessage(String topic,
         String msgId) throws RemotingException, MQBrokerException, InterruptedException, MQClientException;

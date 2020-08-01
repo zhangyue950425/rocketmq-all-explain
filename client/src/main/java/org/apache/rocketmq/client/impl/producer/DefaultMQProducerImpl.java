@@ -176,34 +176,40 @@ public class DefaultMQProducerImpl implements MQProducerInner {
     }
 
     public void start(final boolean startFactory) throws MQClientException {
+        //判断生产者实例的状态：初始状态是CREATE_JUST，服务刚启动
         switch (this.serviceState) {
             case CREATE_JUST:
                 this.serviceState = ServiceState.START_FAILED;
-
+                //首先检查produceGroup是否符合要求
                 this.checkConfig();
 
+                //producerGroup不等于CLIENT_INNER_PRODUCER的时候，改变生产者的instanceName为进程ID
                 if (!this.defaultMQProducer.getProducerGroup().equals(MixAll.CLIENT_INNER_PRODUCER_GROUP)) {
                     this.defaultMQProducer.changeInstanceNameToPID();
                 }
-
+                //创建MQClientInstance实例，因为MQClientManager是单例模式创建的，所以JVM实例中只有一个这个实例，会维护
+                //一个MQClientManager缓存表，存放的key是clientId，value是MQClientInstance。MQClientInstance是干嘛用？？？
+                //factoryTable用处
                 this.mQClientFactory = MQClientManager.getInstance().getOrCreateMQClientInstance(this.defaultMQProducer, rpcHook);
-
+                //注册生产者：向MQClientInstance注册，将当前生产者加入到producerTable中，方便后续调用网络请求,进行心跳检测等
                 boolean registerOK = mQClientFactory.registerProducer(this.defaultMQProducer.getProducerGroup(), this);
                 if (!registerOK) {
+                    //注册失败的话抛出异常，状态仍然是服务刚创建好，注册失败一般情况是生产组为空，或者是已经注册过了，producerTable 已经存在这个生产者
                     this.serviceState = ServiceState.CREATE_JUST;
                     throw new MQClientException("The producer group[" + this.defaultMQProducer.getProducerGroup()
                         + "] has been created before, specify another name please." + FAQUrl.suggestTodo(FAQUrl.GROUP_NAME_DUPLICATE_URL),
                         null);
                 }
-
+                //注册成功的话，topicPublishInfoTable放入数据
                 this.topicPublishInfoTable.put(this.defaultMQProducer.getCreateTopicKey(), new TopicPublishInfo());
-
+                //启动mQClientFactory？？？
                 if (startFactory) {
                     mQClientFactory.start();
                 }
 
                 log.info("the producer [{}] start OK. sendMessageWithVIPChannel={}", this.defaultMQProducer.getProducerGroup(),
                     this.defaultMQProducer.isSendMessageWithVIPChannel());
+                //设置服务状态为运行中
                 this.serviceState = ServiceState.RUNNING;
                 break;
             case RUNNING:
@@ -216,9 +222,10 @@ public class DefaultMQProducerImpl implements MQProducerInner {
             default:
                 break;
         }
-
+        //发送心跳？？？
         this.mQClientFactory.sendHeartbeatToAllBrokerWithLock();
 
+        //定时任务？？？
         this.timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
@@ -232,12 +239,15 @@ public class DefaultMQProducerImpl implements MQProducerInner {
     }
 
     private void checkConfig() throws MQClientException {
+        //producerGroup要求：不能为空，长度不能大于255，不能不符合正则表达式
         Validators.checkGroup(this.defaultMQProducer.getProducerGroup());
 
+        //不能为null
         if (null == this.defaultMQProducer.getProducerGroup()) {
             throw new MQClientException("producerGroup is null", null);
         }
 
+        //不能和默认Topic的名称一致，默认名称为：DEFAULT_PRODUCER
         if (this.defaultMQProducer.getProducerGroup().equals(MixAll.DEFAULT_PRODUCER_GROUP)) {
             throw new MQClientException("producerGroup can not equal " + MixAll.DEFAULT_PRODUCER_GROUP + ", please specify another one.",
                 null);

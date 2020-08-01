@@ -22,6 +22,9 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * 消息封装类：包括消息的基础属性和扩展属性和消息体
+ */
 public class Message implements Serializable {
     private static final long serialVersionUID = 8445773977080406428L;
 
@@ -38,6 +41,15 @@ public class Message implements Serializable {
         this(topic, "", "", 0, body, true);
     }
 
+    /**
+     *
+     * @param topic
+     * @param tags 消息扩展属性：消息TAG，用于消息过滤
+     * @param keys Message索引值，多个用空格隔开，RocketMQ可以根据这些keys快速检索到索引文件
+     * @param flag 消息flag，不作处理
+     * @param body 消息实体
+     * @param waitStoreMsgOK 用于表示消息发送之后是否需要等待消息存储之后返回响应
+     */
     public Message(String topic, String tags, String keys, int flag, byte[] body, boolean waitStoreMsgOK) {
         this.topic = topic;
         this.flag = flag;
@@ -136,6 +148,10 @@ public class Message implements Serializable {
         this.setKeys(sb.toString().trim());
     }
 
+    /**
+     * delayTimeLevel：消息延迟级别，用于消息重试或者是定时消息，只有固定几个消息延迟级别
+     * @return
+     */
     public int getDelayTimeLevel() {
         String t = this.getProperty(MessageConst.PROPERTY_DELAY_TIME_LEVEL);
         if (t != null) {
