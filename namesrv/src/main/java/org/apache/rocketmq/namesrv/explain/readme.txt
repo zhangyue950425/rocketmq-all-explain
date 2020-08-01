@@ -12,3 +12,16 @@ RocketMQ路由注册是通过Broker与NameServer的心跳功能实现。Broker�
 每隔30秒向集群中所有NameServer发送心跳包，NameServer收到Broker心跳包时会更新brokerLiveTable缓存中
 BrokerLiveInfo的lastUpdateTimestamp，然后NameServer每隔10秒（定时任务）扫描brokerLiveTable，如果连续120
 秒没有收到心跳包，NameServer将移除该Broker的路由信息同时关闭Socket连接。
+
+Broker注册：
+NameServer与Broker保持长连接，Broker状态存储在brokerLiveTable中，NameServer每收到一个心跳包，
+将更新brokerLiveTable有关Broker的状态信息以及路由表（topicQueueTable，brokerAddrTable，brokerLiveTable，
+filterServerTable）。更新上述路由表（HashTable）使用了粒度较少的读写锁，允许多个消息发送者（Producer）
+并发读，保证消息发送的高并发。但同一时刻NameServer只处理一个Broker心跳包，多个心跳包请求串行执行。
+
+路由删除：
+RocketMQ有两个点会触发路由删除：
+1）NameServer会定时扫描BrokerLiveTable检测上次心跳包与当前系统时间的时间差，如果时间差大于120秒的话，则会移除该Broker信息。
+2）Broker在被正常关闭的时候，会执行unregisterBroker指令。
+以上两种触发方式都是有个逻辑，就是从topicQueueTable，brokerAddrTable，brokerLiveTable，filterServerTable删除
+与该Broker相关的信息，主要是RoutineInfoManager.scanNotActiveBroker()。

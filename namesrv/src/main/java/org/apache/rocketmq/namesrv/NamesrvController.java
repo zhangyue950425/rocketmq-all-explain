@@ -89,7 +89,7 @@ public class NamesrvController {
 
             @Override
             public void run() {
-                //定时器：每隔10秒扫描一次Broker，移除处于不激活状态的Broker
+                //定时器：每隔10秒扫描一次Broker，移除处于不激活状态的Broker:120秒没有心跳信息的Broker
                 NamesrvController.this.routeInfoManager.scanNotActiveBroker();
             }
         }, 5, 10, TimeUnit.SECONDS);
