@@ -605,34 +605,45 @@ public class MQClientInstance {
     public boolean updateTopicRouteInfoFromNameServer(final String topic, boolean isDefault,
         DefaultMQProducer defaultMQProducer) {
         try {
+            //加锁？？？
             if (this.lockNamesrv.tryLock(LOCK_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
                 try {
                     TopicRouteData topicRouteData;
+                    //isDefault为true，表示使用默认主题查询
                     if (isDefault && defaultMQProducer != null) {
                         topicRouteData = this.mQClientAPIImpl.getDefaultTopicRouteInfoFromNameServer(defaultMQProducer.getCreateTopicKey(),
                             1000 * 3);
+                        //查询的路由信息不为空的话
                         if (topicRouteData != null) {
                             for (QueueData data : topicRouteData.getQueueDatas()) {
+                                //替换路由信息
                                 int queueNums = Math.min(defaultMQProducer.getDefaultTopicQueueNums(), data.getReadQueueNums());
                                 data.setReadQueueNums(queueNums);
                                 data.setWriteQueueNums(queueNums);
                             }
                         }
                     } else {
+                        //isDefault为false：不使用默认的主题查询，使用参数中的主题去NameServer查询
+                        // 或者是defaultMQProducer为null
                         topicRouteData = this.mQClientAPIImpl.getTopicRouteInfoFromNameServer(topic, 1000 * 3);
                     }
                     if (topicRouteData != null) {
+                        //通过NameServer找到该主题的路由信息之后，先和本地存的数据对比，从topicRouteTable查询是否有该topic的路由信息
                         TopicRouteData old = this.topicRouteTable.get(topic);
+                        //判断路由信息是否发生变化：比较每个字段的数据是否相等
                         boolean changed = topicRouteDataIsChange(old, topicRouteData);
                         if (!changed) {
+                            //判断路由信息发生变化的话是否需要更新：如果这个生产者不存在在缓存中或者是缓存中的路由信息中没有消息队列信息的话没有必要更新
                             changed = this.isNeedUpdateTopicRouteInfo(topic);
                         } else {
                             log.info("the topic[{}] route info changed, old[{}] ,new[{}]", topic, old, topicRouteData);
                         }
 
+                        //路由信息需要更新的话
                         if (changed) {
                             TopicRouteData cloneTopicRouteData = topicRouteData.cloneTopicRouteData();
 
+                            //brokerAddrTable中存入Broker名称对应数据（BrokerID对应的地址）
                             for (BrokerData bd : topicRouteData.getBrokerDatas()) {
                                 this.brokerAddrTable.put(bd.getBrokerName(), bd.getBrokerAddrs());
                             }
@@ -786,11 +797,18 @@ public class MQClientInstance {
         }
     }
 
+    /**
+     * 比较某个主题的新旧路由信息是否有变化
+     * @param olddata 旧的缓存的路由信息
+     * @param nowdata 新的从NameServer中获取的路由信息
+     * @return
+     */
     private boolean topicRouteDataIsChange(TopicRouteData olddata, TopicRouteData nowdata) {
         if (olddata == null || nowdata == null)
             return true;
         TopicRouteData old = olddata.cloneTopicRouteData();
         TopicRouteData now = nowdata.cloneTopicRouteData();
+        //排序作用？？？
         Collections.sort(old.getQueueDatas());
         Collections.sort(old.getBrokerDatas());
         Collections.sort(now.getQueueDatas());
@@ -1019,12 +1037,19 @@ public class MQClientInstance {
         return null;
     }
 
+    /**
+     * 通过Broker名称查找Broker的网络地址
+     * @param brokerName
+     * @return
+     */
     public String findBrokerAddressInPublish(final String brokerName) {
+        //先尝试从缓存brokerAddrTable中获取
         HashMap<Long/* brokerId */, String/* address */> map = this.brokerAddrTable.get(brokerName);
         if (map != null && !map.isEmpty()) {
+            //不为空的返回主节点地址
             return map.get(MixAll.MASTER_ID);
         }
-
+        //返回null表示MQClientInstance没有缓存该Broker的地址
         return null;
     }
 

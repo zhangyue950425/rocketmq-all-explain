@@ -22,12 +22,19 @@ public class TopicConfig {
     private static final String SEPARATOR = " ";
     public static int defaultReadQueueNums = 16;
     public static int defaultWriteQueueNums = 16;
+    //主题名称
     private String topicName;
+    //读队列数量
     private int readQueueNums = defaultReadQueueNums;
+    //写队列数量
     private int writeQueueNums = defaultWriteQueueNums;
+    //权限码
     private int perm = PermName.PERM_READ | PermName.PERM_WRITE;
+    //主题过滤方式，目前只支持SINGLE_TAG
     private TopicFilterType topicFilterType = TopicFilterType.SINGLE_TAG;
+    //保留字段
     private int topicSysFlag = 0;
+    //是否是顺序消息
     private boolean order = false;
 
     public TopicConfig() {

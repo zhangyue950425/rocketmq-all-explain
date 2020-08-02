@@ -333,6 +333,8 @@ public class DefaultMQProducer extends ClientConfig implements MQProducer {
     @Override
     public SendResult send(
         Message msg) throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
+        //消息发送第一步：验证消息：消息不能为空，检查Topic名称规范，检查Topic是否可以发送消息：有个集合包含不能发送消息的Topic列表（有RMQ_SYS_SCHEDULE_TOPIC）
+        //消息内容不能为空长度不能为0，不能大于最大值
         Validators.checkMessage(msg, this);
         msg.setTopic(withNamespace(msg.getTopic()));
         return this.defaultMQProducerImpl.send(msg);

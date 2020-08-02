@@ -39,6 +39,7 @@ public class TopicRouteData extends RemotingSerializable {
     private HashMap<String/* brokerAddr */, List<String>/* Filter Server */> filterServerTable;
 
     public TopicRouteData cloneTopicRouteData() {
+        //这个方法的写法？？？
         TopicRouteData topicRouteData = new TopicRouteData();
         topicRouteData.setQueueDatas(new ArrayList<QueueData>());
         topicRouteData.setBrokerDatas(new ArrayList<BrokerData>());

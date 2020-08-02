@@ -32,6 +32,7 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
     @Override
     public void updateFaultItem(final String name, final long currentLatency, final long notAvailableDuration) {
         FaultItem old = this.faultItemTable.get(name);
+        //startTimestamp为当前时间加上不可用时间，就是说到哪个时间Broker可以开始使用
         if (null == old) {
             final FaultItem faultItem = new FaultItem(name);
             faultItem.setCurrentLatency(currentLatency);
@@ -96,9 +97,15 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
             '}';
     }
 
+    /**
+     * 失败条目(规避规则条目)
+     */
     class FaultItem implements Comparable<FaultItem> {
+        //条目名称，条目唯一键，这里是Broker名称
         private final String name;
+        //本次发送消息延迟
         private volatile long currentLatency;
+        //故障规避开始时间
         private volatile long startTimestamp;
 
         public FaultItem(final String name) {

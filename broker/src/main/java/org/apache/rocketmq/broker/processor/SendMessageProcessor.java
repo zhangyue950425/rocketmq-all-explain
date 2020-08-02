@@ -57,6 +57,11 @@ import org.apache.rocketmq.store.PutMessageResult;
 import org.apache.rocketmq.store.config.StorePathConfigHelper;
 import org.apache.rocketmq.store.stats.BrokerStatsManager;
 
+/**
+ * 处理消息发送的处理类：
+ * 1.同步发送：MQ客户端发送消息的入口是MQClientAPIImpl#sendMessage,请求命令是RequestCode.SEND_MESSAGE
+ * SendMessageProcessor类就是该命令的处理类，入口是sendMessage
+ */
 public class SendMessageProcessor extends AbstractSendMessageProcessor implements NettyRequestProcessor {
 
     private List<ConsumeMessageHook> consumeMessageHookList;
@@ -375,6 +380,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
 
         log.debug("receive SendMessage request command, {}", request);
 
+        //???
         final long startTimstamp = this.brokerController.getBrokerConfig().getStartAcceptSendRequestTimeStamp();
         if (this.brokerController.getMessageStore().now() < startTimstamp) {
             response.setCode(ResponseCode.SYSTEM_ERROR);
@@ -383,6 +389,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
         }
 
         response.setCode(-1);
+        //1.检查消息发送是否合理
         super.msgCheck(ctx, requestHeader, response);
         if (response.getCode() != -1) {
             return response;
