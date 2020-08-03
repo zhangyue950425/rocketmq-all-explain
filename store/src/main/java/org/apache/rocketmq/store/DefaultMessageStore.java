@@ -63,27 +63,32 @@ import org.apache.rocketmq.store.index.QueryOffsetResult;
 import org.apache.rocketmq.store.schedule.ScheduleMessageService;
 import org.apache.rocketmq.store.stats.BrokerStatsManager;
 
+/**
+ * 消息存储实现类
+ */
 public class DefaultMessageStore implements MessageStore {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
 
+    //消息存储配置属性
     private final MessageStoreConfig messageStoreConfig;
-    // CommitLog
+    // CommitLog文件的存储实现类
     private final CommitLog commitLog;
 
+    //消息队列存储缓存表，按照消息主题分组
     private final ConcurrentMap<String/* topic */, ConcurrentMap<Integer/* queueId */, ConsumeQueue>> consumeQueueTable;
-
+    //消息队列文件ConsumeQueue刷盘线程
     private final FlushConsumeQueueService flushConsumeQueueService;
-
+    //清除commitlog文件服务
     private final CleanCommitLogService cleanCommitLogService;
-
+    //清除从ConsumeQueue文件服务
     private final CleanConsumeQueueService cleanConsumeQueueService;
-
+    //索引文件实现类
     private final IndexService indexService;
-
+    //MappedFile分配服务
     private final AllocateMappedFileService allocateMappedFileService;
-
+    //CommitLog消息分发服务，根据CommitLog文件构建ConsumeQueue和IndexFile文件
     private final ReputMessageService reputMessageService;
-
+    //存储HA机制
     private final HAService haService;
 
     private final ScheduleMessageService scheduleMessageService;
@@ -98,15 +103,17 @@ public class DefaultMessageStore implements MessageStore {
     private final ScheduledExecutorService scheduledExecutorService =
         Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl("StoreScheduledThread"));
     private final BrokerStatsManager brokerStatsManager;
+    //消息拉取长轮询模式消息达到监听器
     private final MessageArrivingListener messageArrivingListener;
+    //Broker配置属性
     private final BrokerConfig brokerConfig;
 
     private volatile boolean shutdown = true;
-
+    //文件刷盘监测点
     private StoreCheckpoint storeCheckpoint;
 
     private AtomicLong printTimes = new AtomicLong(0);
-
+    //Commitlog文件转发请求
     private final LinkedList<CommitLogDispatcher> dispatcherList;
 
     private RandomAccessFile lockFile;
@@ -383,6 +390,11 @@ public class DefaultMessageStore implements MessageStore {
         return PutMessageStatus.PUT_OK;
     }
 
+    /**
+     * 如果当前Broker停止工作或者是Broker为Slave角色或者是
+     * 当前不支持写入或者是系统pageCache繁忙都返回服务不可用
+     * @return
+     */
     private PutMessageStatus checkStoreStatus() {
         if (this.shutdown) {
             log.warn("message store has shutdown, so putMessage is forbidden");
@@ -397,6 +409,7 @@ public class DefaultMessageStore implements MessageStore {
             return PutMessageStatus.SERVICE_NOT_AVAILABLE;
         }
 
+        //???
         if (!this.runningFlags.isWriteable()) {
             long value = this.printTimes.getAndIncrement();
             if ((value % 50000) == 0) {
@@ -473,28 +486,35 @@ public class DefaultMessageStore implements MessageStore {
         return resultFuture;
     }
 
+    /**
+     * 消息发送之后，消息存储入口函数
+     * @param msg Message instance to store
+     * @return
+     */
     @Override
     public PutMessageResult putMessage(MessageExtBrokerInner msg) {
+        //检查状态
         PutMessageStatus checkStoreStatus = this.checkStoreStatus();
         if (checkStoreStatus != PutMessageStatus.PUT_OK) {
             return new PutMessageResult(checkStoreStatus, null);
         }
-
+        //检查消息长度
         PutMessageStatus msgCheckStatus = this.checkMessage(msg);
         if (msgCheckStatus == PutMessageStatus.MESSAGE_ILLEGAL) {
             return new PutMessageResult(msgCheckStatus, null);
         }
-
+        //获取当前时间
         long beginTime = this.getSystemClock().now();
         PutMessageResult result = this.commitLog.putMessage(msg);
         long elapsedTime = this.getSystemClock().now() - beginTime;
         if (elapsedTime > 500) {
             log.warn("not in lock elapsed time(ms)={}, bodyLength={}", elapsedTime, msg.getBody().length);
         }
-
+        //???
         this.storeStatsService.setPutMessageEntireTimeMax(elapsedTime);
 
         if (null == result || !result.isOk()) {
+            //消息存储失败次数记录
             this.storeStatsService.getPutMessageFailedTimes().incrementAndGet();
         }
 

@@ -41,28 +41,47 @@ import org.apache.rocketmq.store.config.FlushDiskType;
 import org.apache.rocketmq.store.util.LibC;
 import sun.nio.ch.DirectBuffer;
 
+/**
+ * 这个类可以看做是CommitLog文件夹下的文件
+ */
 public class MappedFile extends ReferenceResource {
+    //操作系统每页大小，默认是4k
     public static final int OS_PAGE_SIZE = 1024 * 4;
     protected static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
 
+    //当前JVM实例中MappedFile虚拟内存
     private static final AtomicLong TOTAL_MAPPED_VIRTUAL_MEMORY = new AtomicLong(0);
 
+    //当前JVM实例中MappedFile的文件个数
     private static final AtomicInteger TOTAL_MAPPED_FILES = new AtomicInteger(0);
+    //当前该文件的写指针，从0开始(内存映射文件的写指针)
     protected final AtomicInteger wrotePosition = new AtomicInteger(0);
+    //当前文件的提交指针
     protected final AtomicInteger committedPosition = new AtomicInteger(0);
+    //刷数据到磁盘的指针，该指针指针之前的数据持久化到磁盘中
     private final AtomicInteger flushedPosition = new AtomicInteger(0);
+    //文件大小
     protected int fileSize;
+    //文件通道
     protected FileChannel fileChannel;
     /**
      * Message will put to here first, and then reput to FileChannel if writeBuffer is not null.
      */
+    //堆内存ByteBuffer，如果不为空，数据首先将存储在该buffer中，然后提交到MappedFile对应的内存映射文件buffer
     protected ByteBuffer writeBuffer = null;
+    //堆内存池，transientStorePoolEnable为true是开启
     protected TransientStorePool transientStorePool = null;
+    //文件名称
     private String fileName;
+    //该文件的初始偏移量
     private long fileFromOffset;
+    //物理文件
     private File file;
+    //物理文件对应的内存映射buffer
     private MappedByteBuffer mappedByteBuffer;
+    //文件最后一次内容写入时间
     private volatile long storeTimestamp = 0;
+    //是否是MappedFileQueue队列中第一个文件
     private boolean firstCreateInQueue = false;
 
     public MappedFile() {
@@ -141,6 +160,13 @@ public class MappedFile extends ReferenceResource {
         return TOTAL_MAPPED_VIRTUAL_MEMORY.get();
     }
 
+    /**
+     * 1.MappedFile初始化
+     * @param fileName
+     * @param fileSize
+     * @param transientStorePool
+     * @throws IOException
+     */
     public void init(final String fileName, final int fileSize,
         final TransientStorePool transientStorePool) throws IOException {
         init(fileName, fileSize);
@@ -266,6 +292,7 @@ public class MappedFile extends ReferenceResource {
     }
 
     /**
+     * MappedFile刷盘：将内存中的数据写入到磁盘，永久存储在磁盘中
      * @return The current flushed position
      */
     public int flush(final int flushLeastPages) {
@@ -335,6 +362,11 @@ public class MappedFile extends ReferenceResource {
         }
     }
 
+    /**
+     * ???
+     * @param flushLeastPages
+     * @return
+     */
     private boolean isAbleToFlush(final int flushLeastPages) {
         int flush = this.flushedPosition.get();
         int write = getReadPosition();

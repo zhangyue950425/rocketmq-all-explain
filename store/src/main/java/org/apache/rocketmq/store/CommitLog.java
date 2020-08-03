@@ -389,6 +389,31 @@ public class CommitLog {
         return new DispatchRequest(-1, false /* success */);
     }
 
+    /**
+     * 消息存储格式：
+     * TOTALSIZE：消息条目总长度，4字节。
+     * MAGICCODE：魔数，4字节。
+     * BODYCRC：消息体crc校验码，4字节。
+     * QUEUEID：消息消费队列ID，4字节。
+     * FLAG：消息flag，不做处理，默认是4字节
+     * QUEUEOFFSET：消息在消息消费队列的偏移量，8字节。
+     * PHYSICALOFFSET：消息在CommitLog文件中的偏移量，8字节。
+     * SYSFLAG：消息系统flag，例如是否压缩，是否是事务消息等，4字节。
+     * BORNTIMESTAMP：消息生产者调用消息API时的时间戳，8字节。
+     * BORNHOST：消息发送者IP，端口号，8字节。
+     * STORETIMESTAMP：消息存储时间戳，8字节。
+     * STOREHOSTADDRESS：Broker服务器IP和端口号，8字节。
+     * RECONSUMETIMES：消息重试次数，4字节。
+     * Prepared Transaction Offset：事务消息物理偏移量，8字节。
+     * bodyLength：消息体长度，4字节。
+     * topicLength：主题长度，4字节。
+     * propertiesLength：消息属性长度，2字节，表示消息属性长度不能超过65536个字符。
+     * @param sysFlag
+     * @param bodyLength
+     * @param topicLength
+     * @param propertiesLength
+     * @return
+     */
     protected static int calMsgLength(int sysFlag, int bodyLength, int topicLength, int propertiesLength) {
         int bornhostLength = (sysFlag & MessageSysFlag.BORNHOST_V6_FLAG) == 0 ? 8 : 20;
         int storehostAddressLength = (sysFlag & MessageSysFlag.STOREHOSTADDRESS_V6_FLAG) == 0 ? 8 : 20;
@@ -795,6 +820,7 @@ public class CommitLog {
         if (tranType == MessageSysFlag.TRANSACTION_NOT_TYPE
             || tranType == MessageSysFlag.TRANSACTION_COMMIT_TYPE) {
             // Delay Delivery
+            //如果消息延迟级别大于0的话，将消息的原本主题和队列
             if (msg.getDelayTimeLevel() > 0) {
                 if (msg.getDelayTimeLevel() > this.defaultMessageStore.getScheduleMessageService().getMaxDelayLevel()) {
                     msg.setDelayTimeLevel(this.defaultMessageStore.getScheduleMessageService().getMaxDelayLevel());
@@ -827,7 +853,7 @@ public class CommitLog {
 
         MappedFile unlockMappedFile = null;
         MappedFile mappedFile = this.mappedFileQueue.getLastMappedFile();
-
+        //写文件之前先获取锁
         putMessageLock.lock(); //spin or ReentrantLock ,depending on store config
         try {
             long beginLockTimestamp = this.defaultMessageStore.getSystemClock().now();
@@ -851,6 +877,9 @@ public class CommitLog {
                 case PUT_OK:
                     break;
                 case END_OF_FILE:
+                    //返回AppendMessageStatus.END_OF_FILE，Broker
+                    //会重新创建一个新的CommitLog来存储消息，可以看出每个CommitLog文件会留下END_FILE_MIN_BLANK_LENGTH=8个字节
+                    //高4字节存储当前文件空闲空间，低4字节存储魔数
                     unlockMappedFile = mappedFile;
                     // Create a new file, re-write the message
                     mappedFile = this.mappedFileQueue.getLastMappedFile(0);
@@ -894,7 +923,9 @@ public class CommitLog {
         storeStatsService.getSinglePutMessageTopicTimesTotal(msg.getTopic()).incrementAndGet();
         storeStatsService.getSinglePutMessageTopicSizeTotal(topic).addAndGet(result.getWroteBytes());
 
+        //刷盘操作：根据是同步刷盘还是异步刷盘方式，将内存中的数据持久化到磁盘
         handleDiskFlush(result, putMessageResult, msg);
+        //然后执行HA主从复制
         handleHA(result, putMessageResult, msg);
 
         return putMessageResult;
@@ -1532,6 +1563,7 @@ public class CommitLog {
 
             this.resetByteBuffer(storeHostHolder, storeHostLength);
             String msgId;
+            //创建全局性唯一消息ID，消息ID有16个字节，消息ID的组成：4字节的IP，4字节的端口号，8字节的消息偏移量
             if ((sysflag & MessageSysFlag.STOREHOSTADDRESS_V6_FLAG) == 0) {
                 msgId = MessageDecoder.createMessageId(this.msgIdMemory, msgInner.getStoreHostBytes(storeHostHolder), wroteOffset);
             } else {
@@ -1539,6 +1571,7 @@ public class CommitLog {
             }
 
             // Record ConsumeQueue information
+            //获取消息在消息队列的偏移量，CommitLog保存了当前所有消息队列的当前待写入偏移量
             keyBuilder.setLength(0);
             keyBuilder.append(msgInner.getTopic());
             keyBuilder.append('-');
@@ -1583,6 +1616,7 @@ public class CommitLog {
 
             final int bodyLength = msgInner.getBody() == null ? 0 : msgInner.getBody().length;
 
+            //根据消息体的长度，主题的长度，属性的长度结合消息存储格式计算消息的长度
             final int msgLen = calMsgLength(msgInner.getSysFlag(), bodyLength, topicLength, propertiesLength);
 
             // Exceeds the maximum message
@@ -1593,6 +1627,9 @@ public class CommitLog {
             }
 
             // Determines whether there is sufficient free space
+            //如果消息长度+END_FILE_MIN_BLANK_LENGTH大于空闲空间的话，返回AppendMessageStatus.END_OF_FILE，Broker
+            //会重新创建一个新的CommitLog来存储消息，可以看出每个CommitLog文件会留下END_FILE_MIN_BLANK_LENGTH=8个字节
+            //高4字节存储当前文件空闲空间，低4字节存储魔数
             if ((msgLen + END_FILE_MIN_BLANK_LENGTH) > maxBlank) {
                 this.resetByteBuffer(this.msgStoreItemMemory, maxBlank);
                 // 1 TOTALSIZE
@@ -1601,6 +1638,7 @@ public class CommitLog {
                 this.msgStoreItemMemory.putInt(CommitLog.BLANK_MAGIC_CODE);
                 // 3 The remaining space may be any value
                 // Here the length of the specially set maxBlank
+                //将消息内容存储到byteBuffer，这里只是将消息存储到MappedFile对应的内存映射Buffer中，并没有刷磁盘
                 final long beginTimeMills = CommitLog.this.defaultMessageStore.now();
                 byteBuffer.put(this.msgStoreItemMemory.array(), 0, maxBlank);
                 return new AppendMessageResult(AppendMessageStatus.END_OF_FILE, wroteOffset, maxBlank, msgId, msgInner.getStoreTimestamp(),
