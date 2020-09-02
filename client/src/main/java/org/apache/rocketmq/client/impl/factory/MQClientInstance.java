@@ -37,7 +37,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.rocketmq.client.ClientConfig;
+import org.apache.rocketmq.client.*;
 import org.apache.rocketmq.client.admin.MQAdminExtInner;
 import org.apache.rocketmq.client.exception.MQBrokerException;
 import org.apache.rocketmq.client.exception.MQClientException;
@@ -111,6 +111,7 @@ public class MQClientInstance {
         }
     });
     private final ClientRemotingProcessor clientRemotingProcessor;
+    //消费者消息拉取服务：单独的一个线程处理，继承Runnable
     private final PullMessageService pullMessageService;
     private final RebalanceService rebalanceService;
     private final DefaultMQProducer defaultMQProducer;
@@ -221,6 +222,10 @@ public class MQClientInstance {
         return mqList;
     }
 
+    /**
+     * MQClientInstance启动方法：在一个JVM中所有消费者，生产者持有同一个MQClientInstance，并且只会启动一次
+     * @throws MQClientException
+     */
     public void start() throws MQClientException {
 
         synchronized (this) {

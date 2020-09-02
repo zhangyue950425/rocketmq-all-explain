@@ -11,3 +11,12 @@ RocketMQ支持三种发送方式：同步(sync),异步(async),单向(oneway)
 
 消息发送流程：
 主要步骤是：验证消息，查找路由，消息发送(包含异常处理机制)
+
+消息拉取基本流程：
+1.消息拉取客户端封装消息拉取请求
+拉取入口方法：DefaultMQPushConsumerImpl#pullMessage()
+2.消息服务器查找并返回消息
+消息服务端消息处理类入口：org.apache.rocketmq.broker.processor.PullMessageProcessor#processRequest()
+3.消息拉取客户端处理返回的消息
+
+

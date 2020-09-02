@@ -227,7 +227,7 @@ public class IndexFile {
                         int prevIndexRead = this.mappedByteBuffer.getInt(absIndexPos + 4 + 8 + 4);
 
                         if (timeDiff < 0) {
-                            break;
+                           break;
                         }
 
                         timeDiff *= 1000L;

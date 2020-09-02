@@ -46,6 +46,7 @@ public interface MQConsumer extends MQAdmin {
      *
      * @param topic message topic
      * @return queue set
+     * 获取消费者对于主题分配了哪些消息队列
      */
     Set<MessageQueue> fetchSubscribeMessageQueues(final String topic) throws MQClientException;
 }

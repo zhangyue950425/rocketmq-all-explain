@@ -193,10 +193,13 @@ public class PullAPIWrapper {
             requestHeader.setExpressionType(expressionType);
 
             String brokerAddr = findBrokerResult.getBrokerAddr();
+            //如果消息是类过滤模式的话，需要根据主题名称，Broker地址找到注册在Broker上的FilterServer，从FilterServer上拉取消息，否则从Broker拉取消息
             if (PullSysFlag.hasClassFilterFlag(sysFlagInner)) {
                 brokerAddr = computPullFromWhichFilterServer(mq.getTopic(), brokerAddr);
             }
 
+            //远程调用拉取消息：消息拉取命令code：RequestCode.PULL_MESSAGE，根据不同方式调用不同方法
+            //Broker端处理消息拉取的入口类是：org.apache.rocketmq.broker.processor.PullMessageProcessor
             PullResult pullResult = this.mQClientFactory.getMQClientAPIImpl().pullMessage(
                 brokerAddr,
                 requestHeader,
